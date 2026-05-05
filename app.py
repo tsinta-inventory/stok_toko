@@ -14,8 +14,11 @@ url = "https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxz
 # Membaca Data
 df = conn.read(spreadsheet=url)
 
-# Pastikan kolom stok (kolom kedua/index 1) dibaca sebagai angka
-df.iloc[:, 1] = pd.to_numeric(df.iloc[:, 1], errors='coerce').fillna(0).astype(int)
+# --- PERBAIKAN ERROR DI SINI ---
+# Kita bersihkan data stok agar pasti jadi angka, jika gagal akan jadi 0
+if len(df.columns) > 1:
+    df.iloc[:, 1] = pd.to_numeric(df.iloc[:, 1], errors='coerce').fillna(0)
+# -------------------------------
 
 tab1, tab2 = st.tabs(["📦 Cek Stok", "💳 Input Penjualan"])
 
@@ -26,7 +29,6 @@ with tab1:
 with tab2:
     st.subheader("Catat Transaksi Baru")
     with st.form("transaksi"):
-        # Pilih produk berdasarkan kolom pertama (Nama Barang)
         list_produk = df.iloc[:, 0].tolist()
         produk = st.selectbox("Pilih Produk", list_produk)
         
@@ -34,18 +36,17 @@ with tab2:
         submit = st.form_submit_button("Simpan & Potong Stok")
 
         if submit:
-            # Mencari baris barang yang dipilih
             idx = df[df.iloc[:, 0] == produk].index[0]
-            stok_lama = int(df.iloc[idx, 1])
+            # Pastikan stok_lama dikonversi ke angka saat pengecekan
+            stok_lama = float(df.iloc[idx, 1])
             
             if stok_lama >= jumlah:
-                # Proses pengurangan stok
                 df.iloc[idx, 1] = stok_lama - jumlah
                 
                 # Update kembali ke Google Sheets
                 conn.update(spreadsheet=url, data=df)
                 
-                st.success(f"Berhasil! Stok {produk} berkurang. Sisa stok sekarang: {df.iloc[idx, 1]}")
+                st.success(f"Berhasil! Stok {produk} berkurang. Sisa: {df.iloc[idx, 1]}")
                 st.balloons()
             else:
-                st.error(f"Stok tidak cukup! Stok saat ini hanya ada {stok_lama}")
+                st.error(f"Stok tidak cukup! Sisa stok: {stok_lama}")
