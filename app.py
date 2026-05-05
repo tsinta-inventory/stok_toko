@@ -2,19 +2,17 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="Kasir Toko Tsinta", layout="wide")
-st.title("👕 Sistem Manajemen Stok & Kasir")
+st.set_page_config(page_title="Kasir Toko", layout="wide")
+st.title("🛒 Kasir Toko Sederhana")
 
-# Membuat koneksi ke Google Sheets
+# Koneksi ke Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Membaca data dari Google Sheets
-def ambil_data():
-    return conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing", ttl=0)
+# Ambil Data
+url = "https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing"
+df = conn.read(spreadsheet=url, usecols=[0, 1, 2]) # Sesuaikan kolom Nama, Stok, Harga
 
-df = ambil_data()
-
-tab1, tab2 = st.tabs(["📦 Cek Stok", "🛒 Input Penjualan"])
+tab1, tab2 = st.tabs(["📦 Cek Stok", "💳 Input Penjualan"])
 
 with tab1:
     st.subheader("Daftar Barang Tersedia")
@@ -22,21 +20,21 @@ with tab1:
 
 with tab2:
     st.subheader("Catat Transaksi Baru")
-    with st.form("form_kasir"):
-        produk = st.selectbox("Pilih Produk", df['Nama Barang'].unique())
+    with st.form("transaksi"):
+        produk = st.selectbox("Pilih Produk", df.iloc[:, 0].tolist())
         jumlah = st.number_input("Jumlah Beli", min_value=1, step=1)
-        proses = st.form_submit_button("Simpan & Potong Stok")
-        
-        if proses:
-            # Logika memotong stok
-            idx = df[df['Nama Barang'] == produk].index[0]
-            stok_sekarang = df.at[idx, 'Stok']
+        submit = st.form_submit_button("Simpan & Potong Stok")
+
+        if submit:
+            # Proses potong stok
+            idx = df[df.iloc[:, 0] == produk].index[0]
+            stok_lama = df.iloc[idx, 1]
             
-            if stok_sekarang >= jumlah:
-                df.at[idx, 'Stok'] = stok_sekarang - jumlah
+            if stok_lama >= jumlah:
+                df.iloc[idx, 1] = stok_lama - jumlah
                 # Update ke Google Sheets
-                conn.update(spreadsheet="https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing", data=df)
-                st.success(f"Berhasil! Stok {produk} berkurang menjadi {stok_sekarang - jumlah}")
+                conn.update(spreadsheet=url, data=df)
+                st.success(f"Berhasil! Stok {produk} berkurang.")
                 st.balloons()
             else:
-                st.error(f"Stok tidak cukup! Sisa stok {produk} hanya {stok_sekarang}")
+                st.error("Stok tidak cukup!")
