@@ -1,64 +1,65 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import requests
 
-st.set_page_config(page_title="Kasir Toko", layout="wide")
-st.title("🛒 Kasir Toko Sederhana")
+st.set_page_config(page_title="Kasir Toko API", layout="wide")
+st.title("🛒 Kasir Toko (Via SheetDB)")
 
-# Koneksi ke Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
-url = "https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing"
+# API URL yang baru Anda buat
+API_URL = "https://sheetdb.io/api/v1/ar1o4wvhtcr6b"
 
-# Membaca Data
-try:
-    # Membaca semua kolom agar tidak bingung
-    df = conn.read(spreadsheet=url)
-except Exception as e:
-    st.error(f"Gagal terhubung ke Google Sheets: {e}")
-    st.stop()
+# Fungsi untuk mengambil data terbaru dari Google Sheets
+def get_data():
+    response = requests.get(API_URL)
+    if response.status_code == 200:
+        return pd.DataFrame(response.json())
+    else:
+        return pd.DataFrame()
+
+df = get_data()
 
 tab1, tab2 = st.tabs(["📦 Cek Stok", "💳 Input Penjualan"])
 
 with tab1:
-    st.subheader("Daftar Barang Tersedia")
+    st.subheader("Daftar Barang")
     if not df.empty:
+        # Menampilkan tabel stok
         st.dataframe(df, use_container_width=True)
     else:
-        st.warning("Data kosong.")
+        st.error("Gagal mengambil data dari API.")
 
 with tab2:
-    st.subheader("Catat Transaksi Baru")
+    st.subheader("Catat Penjualan")
     if not df.empty:
         with st.form("transaksi"):
-            # Pilih produk berdasarkan 'Nama Barang' (Kolom B)
-            list_produk = df['Nama Barang'].tolist()
-            produk = st.selectbox("Pilih Produk", list_produk)
-            
+            # Kolom 'Nama Barang' harus sama persis dengan di Google Sheets
+            produk = st.selectbox("Pilih Produk", df['Nama Barang'].tolist())
             jumlah = st.number_input("Jumlah Beli", min_value=1, step=1)
             submit = st.form_submit_button("Simpan & Potong Stok")
 
             if submit:
-                # Cari baris produk
-                idx = df[df['Nama Barang'] == produk].index[0]
+                # Ambil baris produk yang dipilih
+                row = df[df['Nama Barang'] == produk].iloc[0]
+                stok_lama = int(row['Stok'])
                 
-                try:
-                    # Ambil nilai dari kolom 'Stok' (Kolom D)
-                    stok_sekarang = pd.to_numeric(df.at[idx, 'Stok'], errors='coerce')
+                if stok_lama >= jumlah:
+                    stok_baru = stok_lama - jumlah
                     
-                    if pd.isna(stok_sekarang):
-                        st.error(f"Data stok untuk {produk} di kolom D bukan angka!")
-                    elif stok_sekarang >= jumlah:
-                        # Potong stok di kolom 'Stok'
-                        df.at[idx, 'Stok'] = int(stok_sekarang - jumlah)
-                        
-                        # Update ke Google Sheets
-                        conn.update(spreadsheet=url, data=df)
-                        
-                        st.success(f"Berhasil! Stok {produk} berkurang. Sisa: {df.at[idx, 'Stok']}")
+                    # Proses Update ke Google Sheets via SheetDB
+                    # Update dilakukan berdasarkan kolom 'Nama Barang'
+                    update_url = f"{API_URL}/Nama%20Barang/{produk}"
+                    data_update = {"data": {"Stok": stok_baru}}
+                    
+                    res = requests.put(update_url, json=data_update)
+                    
+                    if res.status_code == 200:
+                        st.success(f"Berhasil! Stok {produk} sekarang: {stok_baru}")
                         st.balloons()
+                        # Refresh data setelah berhasil
+                        st.rerun()
                     else:
-                        st.error(f"Stok tidak cukup! Sisa: {int(stok_sekarang)}")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan: {e}")
+                        st.error("Gagal memperbarui stok di server.")
+                else:
+                    st.error(f"Stok tidak cukup! Sisa stok: {stok_lama}")
     else:
-        st.warning("Tidak ada produk.")
+        st.warning("Data produk tidak tersedia.")
