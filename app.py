@@ -1,22 +1,16 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
 st.set_page_config(page_title="Kasir Toko Tsinta", layout="wide")
 st.title("👕 Sistem Manajemen Stok & Kasir")
 
-# LINK YANG SUDAH DIPERBAIKI
-URL_DATABASE = "https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/export?format=csv"
+# Membuat koneksi ke Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
 
+# Membaca data dari Google Sheets
 def ambil_data():
-    try:
-        return pd.read_csv(URL_DATABASE)
-    except:
-        return pd.DataFrame({
-            'Nama Barang': ['Kaos Polo Scuba', 'Kemeja Victor', 'Chinos Panjang', 'Hoodie Polos'],
-            'Kategori': ['Polo', 'Kemeja', 'Celana', 'Hoodie'],
-            'Stok': [10, 15, 20, 5],
-            'Harga': [85000, 120000, 150000, 135000]
-        })
+    return conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing", ttl=0)
 
 df = ambil_data()
 
@@ -30,8 +24,19 @@ with tab2:
     st.subheader("Catat Transaksi Baru")
     with st.form("form_kasir"):
         produk = st.selectbox("Pilih Produk", df['Nama Barang'].unique())
-        jumlah = st.number_input("Jumlah Beli", min_value=1)
-        proses = st.form_submit_button("Simpan Transaksi")
+        jumlah = st.number_input("Jumlah Beli", min_value=1, step=1)
+        proses = st.form_submit_button("Simpan & Potong Stok")
         
         if proses:
-            st.success(f"Berhasil mencatat penjualan {jumlah} {produk}!")
+            # Logika memotong stok
+            idx = df[df['Nama Barang'] == produk].index[0]
+            stok_sekarang = df.at[idx, 'Stok']
+            
+            if stok_sekarang >= jumlah:
+                df.at[idx, 'Stok'] = stok_sekarang - jumlah
+                # Update ke Google Sheets
+                conn.update(spreadsheet="https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing", data=df)
+                st.success(f"Berhasil! Stok {produk} berkurang menjadi {stok_sekarang - jumlah}")
+                st.balloons()
+            else:
+                st.error(f"Stok tidak cukup! Sisa stok {produk} hanya {stok_sekarang}")
