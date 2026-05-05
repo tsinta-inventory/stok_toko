@@ -4,15 +4,13 @@ import pandas as pd
 st.set_page_config(page_title="Kasir Toko Tsinta", layout="wide")
 st.title("👕 Sistem Manajemen Stok & Kasir")
 
-# PENTING: Ganti link di bawah dengan link Google Sheets Anda
-# Pastikan link diakhiri dengan /export?format=csv
-URL_DATABASE = "https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/edit?usp=sharing"
+# LINK YANG SUDAH DIPERBAIKI
+URL_DATABASE = "https://docs.google.com/spreadsheets/d/10ZsM17t1Yc9wzrbngX1ufIXKcW3fbIaxzlEkUuL4EZo/export?format=csv"
 
 def ambil_data():
     try:
         return pd.read_csv(URL_DATABASE)
     except:
-        # Data contoh jika link belum dipasang
         return pd.DataFrame({
             'Nama Barang': ['Kaos Polo Scuba', 'Kemeja Victor', 'Chinos Panjang', 'Hoodie Polos'],
             'Kategori': ['Polo', 'Kemeja', 'Celana', 'Hoodie'],
